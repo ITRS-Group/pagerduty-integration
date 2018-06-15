@@ -2,44 +2,23 @@
 import requests, base64, json, sys, argparse, os
 from argparse import RawTextHelpFormatter
 
-
-SUBDOMAIN = "manny" # Enter your subdomain here
-API_ACCESS_KEY = "QiaeVM4257psyzkVSs5Q" # Enter your subdomain's API access key here
-
 # apiKey = "QiaeVM4257psyzkVSs5Q"
+authorization_token = 'QiaeVM4257psyzkVSs5Q'
 pagerduty_session = requests.Session()
+pagerduty_session.headers.update({
+  'Authorization': 'Token token=' + authorization_token,
+  'Accept': 'application/vnd.pagerduty+json;version=2'
+})
 
-def trigger_incident_without_key_name():
-    """Triggers an incident with a previously generated incident key."""
+# Prep response for necessary results
+User_List = pagerduty_session.get('https://api.pagerduty.com/incidents')
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': 'Token token={0}'.format(API_ACCESS_KEY),
-        'Content-type': 'application/json',
-    }
-
-    payload = json.dumps({
-        "service_key": "3e2966c4fe574b978ca0db7414d5e504", # Enter service key here
-        "incident_key": "srv01/HTTP",
-        "event_type": "trigger",
-        "description": "FAILURE for production/HTTP on machine srv01.acme.com",
-        "client": "Sample Monitoring Service",
-        "client_url": "https://monitoring.service.com",
-        "details": {
-            "ping time": "1500ms",
-            "load avg": 0.75
-        }
-    })
-
-    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/generic/2010-04-15/create_event.json',
-                      headers=headers,
-                      data=payload,
+# response.encoding = 'utf-8'
+if User_List.status_code != 200:
+    raise ValueError(
+        'Request to PagerDuty a server returned an error %s, the response is:\n%s'
+        % (response.status_code, response.text)
     )
 
-    print PagerResponse.status_code
-    print PagerResponse.text
-
-
-
-if __name__ == '__main__':
-    # trigger_incident()
+#Print json response info to the screen
+print(json.dumps(User_List.json(), indent=2))
