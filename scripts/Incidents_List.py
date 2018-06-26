@@ -11,7 +11,7 @@ pagerduty_session.headers.update({
 })
 
 # Prep response for necessary results
-User_List = pagerduty_session.get('https://api.pagerduty.com/incidents')
+User_List = pagerduty_session.get('https://api.pagerduty.com/incidents?statuses%5B%5D=acknowledged&statuses%5B%5D=triggered&time_zone=UTC&include%5B%5D=services')
 
 # response.encoding = 'utf-8'
 if User_List.status_code != 200:
@@ -20,5 +20,9 @@ if User_List.status_code != 200:
         % (response.status_code, response.text)
     )
 
-#Print json response info to the screen
-print(json.dumps(User_List.json(), indent=2))
+Incidents = User_List.json()
+print(json.dumps(Incidents, indent=2))
+
+for Incident in Incidents["incidents"]:
+    #Print json response info to the screen
+    print(json.dumps(Incident["incident_key"], indent=2))

@@ -12,16 +12,16 @@ SUBDOMAIN = "manny" # Enter your subdomain here
 API_ACCESS_KEY = "QiaeVM4257psyzkVSs5Q" # Enter your subdomain's API access key here
 SERVICE_KEY = "3e2966c4fe574b978ca0db7414d5e504" # Variablize this value
 
+#Incident Key (x,y of our geneos integration)
+INCIDENT_KEY = EnvData["_GATEWAY"] + "\\" + EnvData["_PROBE"] + "\\" + EnvData["_SAMPLER"] + "\\" + EnvData["_MANAGED_ENTITY"] + "\\" + EnvData["_DATAVIEW"] + "\\" + EnvData["_COLUMN"] + "\\" + EnvData["_ROWNAME"]
+
 # For Testing the script, in leiu of any proxy configuration to test against
 # export _GATEWAY="SomeGateway"
 # export _PROBE="SomeProbe"
-# export _SAMPLER="SomeEntity"
-# export _MANAGED_ENTITY="SomeView"
-# export _DATAVIEW="SomeColumn"
-# export _ROWNAME="SomeCell"
-
-#"] + "\\" + EnvData["_PROBE"] + "\\" + EnvData["_SAMPLER"] + "\\" + EnvData["_MANAGED_ENTITY"] + "\\" + EnvData["_DATAVIEW"] + "\\" + EnvData["_COLUMN"] + "\\" + EnvData["_ROWNAME"]
-INCIDENT_KEY = EnvData["_GATEWAY"] + "\\" + EnvData["_PROBE"] + "\\" + EnvData["_SAMPLER"] + "\\" + EnvData["_MANAGED_ENTITY"] + "\\" + EnvData["_DATAVIEW"] + "\\" + EnvData["_COLUMN"] + "\\" + EnvData["_ROWNAME"]
+# export _SAMPLER="SomeSampler"
+# export _MANAGED_ENTITY="SomeEntity"
+# export _DATAVIEW="SomeDataview"
+# export _ROWNAME="SomeRowName"
 
 # apiKey = "QiaeVM4257psyzkVSs5Q"
 pagerduty_session = requests.Session()
