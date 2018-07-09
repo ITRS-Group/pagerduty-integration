@@ -1,6 +1,10 @@
 #!/usr/bin/python
 import requests, base64, json, sys, argparse, os
+import urllib3
 from argparse import RawTextHelpFormatter
+
+# For Supressing warnings
+# urllib3.disable_warnings()
 
 # Loads the environment variable as JSON structure
 # We will use this later
@@ -11,57 +15,74 @@ EnvData = json.loads(Env_JSON)
 SUBDOMAIN = "manny" # Enter your subdomain here
 API_ACCESS_KEY = "QiaeVM4257psyzkVSs5Q" # Enter your subdomain's API access key here
 SERVICE_KEY = "3e2966c4fe574b978ca0db7414d5e504" # Variablize this value
+GENEOS_PAYLOAD = {} # Massive Payload of geneos information
 
-#Incident Key (x,y of our geneos integration)
-INCIDENT_KEY = EnvData["_GATEWAY"] + "\\" + EnvData["_PROBE"] + "\\" + EnvData["_SAMPLER"] + "\\" + EnvData["_MANAGED_ENTITY"] + "\\" + EnvData["_DATAVIEW"] + "\\" + EnvData["_COLUMN"] + "\\" + EnvData["_ROWNAME"]
+# Incident Key (x,y of our geneos integration)
+# WARNING :: PagerDuty has 255 Character Limit
+INCIDENT_KEY = EnvData["_GATEWAY"] + "\\" + EnvData["_PROBE"] + "\\" + EnvData["_MANAGED_ENTITY"] + "\\" + EnvData["_SAMPLER"] + "\\" + EnvData["_DATAVIEW"] + "\\" + EnvData["_ROWNAME"] + "\\" + EnvData["_COLUMN"]
 
 # For Testing the script, in leiu of any proxy configuration to test against
-# export _GATEWAY="SomeGateway"
-# export _PROBE="SomeProbe"
-# export _SAMPLER="SomeSampler"
-# export _MANAGED_ENTITY="SomeEntity"
-# export _DATAVIEW="SomeDataview"
-# export _ROWNAME="SomeRowName"
+ # export _GATEWAY="SomeGateway"
+ # export _PROBE="SomeProbe"
+ # export _SAMPLER="SomeSampler"
+ # export _MANAGED_ENTITY="SomeEntity"
+ # export _DATAVIEW="SomeDataview"
+ # export _ROWNAME="SomeRowName"
+ # export _SEVERITY="CRITICAL"
+ # export _PREVIOUS_SEV="2"
 
 # apiKey = "QiaeVM4257psyzkVSs5Q"
 pagerduty_session = requests.Session()
 
+# Incident interactions
 def event_trigger_incident():
-    """Triggers an incident with a previously generated incident key via Events API."""
+    # Triggers a PagerDuty incident without a previously generated incident key
+    # Uses Events V2 API - documentation: https://v2.developer.pagerduty.com/docs/send-an-event-events-api-v2
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': 'Token token={0}'.format(API_ACCESS_KEY),
-        'Content-type': 'application/json',
+    header = {
+        "Content-Type": "application/json"
     }
 
-    payload = json.dumps({
-        "service_key": "3e2966c4fe574b978ca0db7414d5e504", # Enter service key here
-        "incident_key": INCIDENT_KEY,
-        "event_type": "trigger",
-        "description": "CRITICAL ITS ON FIRE for production/HTTP on machine srv01.acme.com",
-        "client": "Sample Monitoring Service",
-        "client_url": "https://monitoring.service.com",
-        "details": {
-            "_SEVERITY" : EnvData["_SEVERITY"],
-            "_PREVIOUS_SEVERITY" : EnvData["_PREVIOUS_SEV"]
+    payload = { # Payload is built with the least amount of fields required to trigger an incident
+        "routing_key": SERVICE_KEY,
+        "event_action": "trigger",
+        "dedup_key": INCIDENT_KEY,
+        "integration_key": INCIDENT_KEY,
+        "payload": {
+            "summary" : "Alert on " + EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"] + " " + EnvData["_ROWNAME"] + " : " + EnvData["_COLUMN"] + " at " + EnvData["_VALUE"],
+            "severity": "critical",
+            "source" : EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"],
+            "custom_details" : {
+                "Geneos Event Data" : {
+                    "_SEVERITY" : EnvData["_SEVERITY"]
+                },
+                "Custom Message" : "Use custom detailed here Message"
+            }
         }
-    })
+    }
 
-    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/generic/2010-04-15/create_event.json',
-                      headers=headers,
-                      data=payload,
-    )
+    # Re-Cconstruct Payload for Geneos Event Data
+    for EnvKey in EnvData:
+        if EnvKey.startswith("_"):
+            payload["payload"]["custom_details"]["Geneos Event Data"][EnvKey] = EnvData[EnvKey]
+
+    # Run post to PagerDuty Server
+    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/v2/enqueue',
+                            data=json.dumps(payload),
+                            headers=header)
 
     # response.encoding = 'utf-8'
-    if PagerResponse.status_code != 200:
+    if PagerResponse.status_code != 202:
         raise ValueError(
             'Request to PagerDuty a server returned an error %s, the response is:\n%s'
-            % (response.status_code, response.text)
+            % (PagerResponse.status_code, PagerResponse.text)
             )
 
-    # Load up the Checks found
-    # Check_Found = PagerResponse.json()
+    # If all is good
+    if PagerResponse.json()["status"] == "success":
+        print ('Incident Created')
+    else:
+        print PagerResponse.text # print error message if not successful
 
     # Print json response info to the screen
     print(json.dumps(PagerResponse.json(), indent=2))
@@ -69,33 +90,47 @@ def event_trigger_incident():
 def event_ack_incident():
     """Acknowledges a triggered incident using the customer's API access key and incident key via Events API."""
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': 'Token token={0}'.format(API_ACCESS_KEY),
-        'Content-type': 'application/json'
+    header = {
+        "Content-Type": "application/json"
     }
 
-    payload = json.dumps({
-        "service_key": "3e2966c4fe574b978ca0db7414d5e504", # Enter service key here
-        "incident_key": INCIDENT_KEY, # Enter incident key here
-        "event_type": "acknowledge",
-        "description": "Andrew now working on the problem.", # Enter your own description
-        "details": {
-            "_SEVERITY" : EnvData["_SEVERITY"],
-            "_PREVIOUS_SEVERITY" : EnvData["_PREVIOUS_SEV"]
+    payload = { # Payload is built with the least amount of fields required to trigger an incident
+        "routing_key": SERVICE_KEY,
+        "event_action": "acknowledge",
+        "dedup_key": INCIDENT_KEY,
+        "payload": {
+            "summary" : "Acknowledged on " + EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"],
+            "severity": "warning",
+            "source" : EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"],
+            "custom_details" : {
+                "Geneos Event Data" : {
+                    "_SEVERITY" : EnvData["_SEVERITY"]
+                },
+                "Custom Message" : "Use custom detailed here Message"
+            }
         }
-    })
+    }
 
-    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/generic/2010-04-15/create_event.json',
-                      headers=headers,
-                      data=payload,
-    )
+    # Re-Cconstruct Payload for Geneos Event Data
+    for EnvKey in EnvData:
+            if EnvKey.startswith("_"):
+                payload["payload"]["custom_details"]["Geneos Event Data"][EnvKey] = EnvData[EnvKey]
+
+    # Post to PagerDuty Server
+    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/v2/enqueue',
+                            data=json.dumps(payload),
+                            headers=header)
+    # If all is good
+    if PagerResponse.json()["status"] == "success":
+        print ('Incident Acknowledged ')
+    else:
+        print PagerResponse.text # print error message if not successful
 
     # response.encoding = 'utf-8'
-    if PagerResponse.status_code != 200:
+    if PagerResponse.status_code != 202:
         raise ValueError(
             'Request to PagerDuty a server returned an error %s, the response is:\n%s'
-            % (response.status_code, response.text)
+            % (PagerResponse.status_code, PagerResponse.text)
             )
 
     # Load up the Checks found
@@ -107,37 +142,43 @@ def event_ack_incident():
 def event_resolve_incident():
     """Resolves a PagerDuty incident using customer's API access key and incident key via Events API."""
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': 'Token token={0}'.format(API_ACCESS_KEY),
-        'Content-type': 'application/json',
+    header = {
+        "Content-Type": "application/json"
     }
 
-    payload = json.dumps({
-        "service_key": "3e2966c4fe574b978ca0db7414d5e504", # Enter service key here
-        "incident_key": INCIDENT_KEY, # Enter incident key here
-        "event_type": "resolve",
-        "description": "Some dude fixed the problem.", # Enter personalized description
-        "details": {
-            "_SEVERITY" : EnvData["_SEVERITY"],
-            "_PREVIOUS_SEVERITY" : EnvData["_PREVIOUS_SEV"]
+    # JSON payload
+    payload = { # Payload is built with the least amount of fields required to trigger an incident
+        "routing_key": SERVICE_KEY,
+        "event_action": "resolve",
+        "dedup_key": INCIDENT_KEY,
+        "payload": {
+            "summary" : "Resolved on " + EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"],
+            "severity": "info",
+            "source" : EnvData["_PROBE"] + "/" + EnvData["_HOSTNAME"],
+            "custom_details" : {
+                "Geneos Event Data" : {
+                    "_SEVERITY" : EnvData["_SEVERITY"]
+                },
+                "Custom Message" : "Use custom detailed here Message"
+            }
         }
-    })
+    }
 
-    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/generic/2010-04-15/create_event.json',
-                      headers=headers,
-                      data=payload,
-    )
+    PagerResponse = pagerduty_session.post('https://events.pagerduty.com/v2/enqueue',
+                            data=json.dumps(payload),
+                            headers=header)
+
+    if PagerResponse.json()["status"] == "success":
+        print ('Incident Resolved ')
+    else:
+        print PagerResponse.text # print error message if not successful
 
     # response.encoding = 'utf-8'
-    if PagerResponse.status_code != 200:
+    if PagerResponse.status_code != 202:
         raise ValueError(
             'Request to PagerDuty a server returned an error %s, the response is:\n%s'
-            % (response.status_code, response.text)
+            % (PagerResponse.status_code, PagerResponse.text)
             )
-
-    # Load up the Checks found
-    # Check_Found = PagerResponse.json()
 
     # Print json response info to the screen
     print(json.dumps(PagerResponse.json(), indent=2))

@@ -1,13 +1,24 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
-<!--Edited using Gateway Setup Editor version GA4.6.0-180328 at 2018-06-25 11:52:19 by LNS-Canvas on DESKTOP-3QIJ3R3-->
-<gateway compatibility="1" xsi:noNamespaceSchemaLocation="http://schema.itrsgroup.com/GA4.6.0-180122/gateway.xsd">
+<!--Edited using Gateway Setup Editor version GA4.8.0-180611 at 2018-07-05 14:52:14 by LNS-Canvas on DESKTOP-3QIJ3R3-->
+<gateway compatibility="1" xsi:noNamespaceSchemaLocation="http://schema.itrsgroup.com/GA4.7.0-180314/gateway.xsd">
 	<samplers>
-		<sampler name="PagerDuty Incidents">
+		<sampler name="Open Incidents">
+			<var-group>
+				<data>PagerDuty</data>
+			</var-group>
 			<plugin>
 				<toolkit>
 					<samplerScript>
-						<data/>
+						<data>./Incidents_List.py</data>
 					</samplerScript>
+					<script>
+						<contents>
+							<var ref="Incidents_List"/>
+						</contents>
+						<filename>
+							<data>Incidents_List.py</data>
+						</filename>
+					</script>
 				</toolkit>
 			</plugin>
 		</sampler>
@@ -28,7 +39,7 @@
 			<menu>
 				<label>PagerDuty</label>
 			</menu>
-			<command name="Resolve">
+			<command disabled="true" name="Resolve">
 				<targets>
 					<target/>
 				</targets>
@@ -37,7 +48,7 @@
 					<runLocation>netprobe</runLocation>
 				</userCommand>
 			</command>
-			<command name="Acknowledge">
+			<command disabled="true" name="Acknowledge">
 				<targets>
 					<target/>
 				</targets>
@@ -49,4 +60,136 @@
 		</commandGroup>
 	</commands>
 	<scheduledCommands/>
+	<environments>
+		<environment name="PagerDuty">
+			<var name="Incidents_List">
+				<externalConfigFile>#!/usr/bin/python
+import requests, base64, json, sys, argparse, os
+from argparse import RawTextHelpFormatter
+
+# apiKey = &quot;QiaeVM4257psyzkVSs5Q&quot;
+authorization_token = &apos;QiaeVM4257psyzkVSs5Q&apos;
+pagerduty_session = requests.Session()
+pagerduty_session.headers.update({
+  &apos;Authorization&apos;: &apos;Token token=&apos; + authorization_token,
+  &apos;Accept&apos;: &apos;application/vnd.pagerduty+json;version=2&apos;
+})
+
+# Limit for num of inicdents (This you can tweak)
+Pagination_Limit = 10
+
+# Assume Offset is None
+Offset = 0
+
+# Our_Incidents
+DV_Incidents = {}
+
+# function to call to add to your incident list
+def Update_Incident_List(JSON_Payload):
+
+    # list out your incidents
+    for Incident in JSON_Payload[&quot;incidents&quot;]:
+
+        # Print json response info to the screen
+        bGeneosIncidents = False
+
+        # Geneos_Path = &quot;Not Geneos Alert Generated Inicident&quot;
+        Geneos_Path = &quot;&quot;
+
+        # print(json.dumps(Incident, indent=2))
+        if &quot;details&quot; in Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;]:
+            Details = Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;]
+            if Details is not None and &quot;Geneos Event Data&quot; in Details.keys():
+                if &quot;_VARIABLEPATH&quot; in Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;]:
+                    Geneos_Path = Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;][&quot;_VARIABLEPATH&quot;]
+                    bGeneosIncidents = True
+        #
+        DV_Incidents[Incident[&quot;id&quot;]] = Incident
+        DV_Incidents[Incident[&quot;id&quot;]][&quot;Geneos_Path&quot;] = Geneos_Path
+
+# Starting list for incidents
+Starting_URL = &quot;https://api.pagerduty.com/incidents?statuses%5B%5D=triggered&amp;statuses%5B%5D=acknowledged&amp;time_zone=UTC&amp;include%5B%5D=first_trigger_log_entries&amp;total=true&amp;limit=&quot; + str(Pagination_Limit)
+
+# Prep response for necessary results
+Incidents_list = pagerduty_session.get(Starting_URL)
+
+# response.encoding = &apos;utf-8&apos;
+if Incidents_list.status_code != 200:
+    raise ValueError(
+        &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+        % (Incidents_list.status_code, User_List.text)
+    )
+
+Incidents = Incidents_list.json()
+# print(json.dumps(Incidents, indent=2))
+
+# Add to the Incident list
+Update_Incident_List(Incidents)
+
+# print(json.dumps(Incidents, indent=2))
+# print (&quot;----- Entering Loop -----\n&quot;)
+
+# If there are more incidents
+while Incidents[&quot;more&quot;]:
+    Offset += Pagination_Limit
+    Starting_URL += &quot;&amp;offset=&quot; + str(Offset)
+
+    # Run the Incidents query again
+    Incidents_list = pagerduty_session.get(Starting_URL)
+
+    # response.encoding = &apos;utf-8&apos;
+    if Incidents_list.status_code != 200:
+        raise ValueError(
+            &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+            % (Incidents_list.status_code, User_List.text)
+        )
+
+    Incidents = Incidents_list.json()
+    # print(json.dumps(Incidents, indent=2))
+
+    # Add to the Incident list
+    Update_Incident_List(Incidents)
+
+# print (&quot;----- Exit Loop -----\n&quot;)
+
+# Print out column headings
+print(&quot;Id, Geneos Path, Description, Status, Creation Time, Last Update, Incident Keys, Resolved, Triggered, All&quot;)
+print(&quot;&lt;!&gt; Open Incidents, &quot; + str(len(DV_Incidents)))
+for Incident in DV_Incidents:
+
+     # print(json.dumps(Incident, indent=2))
+     #Print json response info to the screen
+     bGeneosIncidents = False
+
+     # Geneos_Path = &quot;Not Geneos Alert Generated Inicident&quot;
+     Geneos_Path = &quot;&quot;
+
+     if &quot;details&quot; in DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;]:
+        Details = DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;]
+        if Details is not None and &quot;Geneos Event Data&quot; in Details.keys():
+            if &quot;_VARIABLEPATH&quot; in DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;]:
+                Geneos_Path = DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;][&quot;_VARIABLEPATH&quot;]
+                bGeneosIncidents = True
+
+     # print row information
+     print(DV_Incidents[Incident][&quot;id&quot;] + &quot;,&quot; + \
+        Geneos_Path + &quot;,&quot; + \
+        DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;description&quot;] + &quot;,&quot; + \
+        DV_Incidents[Incident][&quot;status&quot;] + &quot;,&quot; + \
+        DV_Incidents[Incident][&quot;created_at&quot;] + &quot;,&quot; + \
+        DV_Incidents[Incident][&quot;last_status_change_at&quot;] + &quot;,&quot; + \
+        DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;incident_key&quot;] + &quot;,&quot; + \
+        str(DV_Incidents[Incident][&quot;alert_counts&quot;][&quot;resolved&quot;]) + &quot;,&quot; + \
+        str(DV_Incidents[Incident][&quot;alert_counts&quot;][&quot;triggered&quot;]) + &quot;,&quot; + \
+        str(DV_Incidents[Incident][&quot;alert_counts&quot;][&quot;all&quot;]) + &quot;,&quot; )
+</externalConfigFile>
+			</var>
+			<var name="PD_ACCESS_KEY">
+				<string>QiaeVM4257psyzkVSs5Q</string>
+			</var>
+			<var name="PD_SERVICE_KEY">
+				<string>3e2966c4fe574b978ca0db7414d5e504</string>
+			</var>
+		</environment>
+	</environments>
 </gateway>
