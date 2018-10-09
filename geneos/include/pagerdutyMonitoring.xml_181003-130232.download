@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--Edited using Gateway Setup Editor version GA4.8.0-180611 at 2018-10-03 13:02:30 by LNS-Canvas on DESKTOP-3QIJ3R3-->
+<gateway compatibility="1" xsi:noNamespaceSchemaLocation="http://schema.itrsgroup.com/GA4.8.0-180731/gateway.xsd">
+	<samplers>
+		<sampler name="Open Incidents Raw">
+			<var-group>
+				<data>PagerDuty</data>
+			</var-group>
+			<sampleInterval>
+				<data>60</data>
+			</sampleInterval>
+			<isVisible>true</isVisible>
+			<plugin>
+				<toolkit>
+					<samplerScript>
+						<data>/bin/python ./Incidents_List.py</data>
+					</samplerScript>
+					<script>
+						<contents>
+							<var ref="Incidents_List"/>
+						</contents>
+						<filename>
+							<data>Incidents_List.py</data>
+						</filename>
+					</script>
+				</toolkit>
+			</plugin>
+		</sampler>
+		<sampler name="Open Incidents">
+			<var-group>
+				<data>PagerDuty</data>
+			</var-group>
+			<sampleInterval>
+				<data>10</data>
+			</sampleInterval>
+			<plugin>
+				<Gateway-sql>
+					<tables>
+						<xpath>
+							<tableName>
+								<data>Incidents</data>
+							</tableName>
+							<xpaths>
+								<xpath>/geneos/gateway/directory/probe/managedEntity/sampler/dataview[wild(@name,&quot;Open Incidents Raw*&quot;)]/rows/row/cell[(@column=&quot;Incident Keys&quot;)]</xpath>
+							</xpaths>
+							<columns>
+								<column>
+									<name>
+										<data>Id</data>
+									</name>
+									<xpath>@rowname</xpath>
+									<type>TEXT</type>
+								</column>
+								<column>
+									<name>
+										<data>Last Alert Msg</data>
+									</name>
+									<xpath>../cell[(@column=&quot;Last Alert&quot;)]</xpath>
+									<type>TEXT</type>
+								</column>
+								<column>
+									<name>
+										<data>Status</data>
+									</name>
+									<xpath>../cell[(@column=&quot;Status&quot;)]</xpath>
+									<type>TEXT</type>
+								</column>
+								<column>
+									<name>
+										<data>Creation Time</data>
+									</name>
+									<xpath>../cell[(@column=&quot;Creation Time&quot;)]</xpath>
+									<type>TEXT</type>
+								</column>
+								<column>
+									<name>
+										<data>Incident Keys</data>
+									</name>
+									<xpath>../cell[(@column=&quot;Incident Keys&quot;)]</xpath>
+									<type>TEXT</type>
+								</column>
+							</columns>
+						</xpath>
+					</tables>
+					<views>
+						<view>
+							<name>
+								<data>Open Incidents</data>
+							</name>
+							<sql>
+								<data>SELECT * from Incidents;</data>
+							</sql>
+						</view>
+					</views>
+				</Gateway-sql>
+			</plugin>
+		</sampler>
+	</samplers>
+	<actions>
+		<action name="PagerDuty_Incident_Call">
+			<script>
+				<exeFile>/bin/python</exeFile>
+				<arguments>
+					<data>/export/home/epayano/Integrations/pagerduty-integration/scripts/Incidents_Manager.py -s &quot;19a16be7429d46b4b6f2048e262e51b9&quot; </data>
+				</arguments>
+				<runLocation>gateway</runLocation>
+			</script>
+		</action>
+		<action disabled="true" name="AutoSnooze">
+			<script>
+				<exeFile/>
+				<arguments>
+					<data/>
+				</arguments>
+				<runLocation>gateway</runLocation>
+			</script>
+		</action>
+		<action disabled="true" name="AutoAssign">
+			<script>
+				<exeFile/>
+				<arguments>
+					<data/>
+				</arguments>
+				<runLocation>gateway</runLocation>
+			</script>
+		</action>
+	</actions>
+	<commands>
+		<commandGroup name="PagerDuty">
+			<menu>
+				<label>PagerDuty</label>
+			</menu>
+			<command name="Resolve">
+				<targets>
+					<target>/geneos/gateway/directory/probe/managedEntity/sampler/dataview[wild(@name,&quot;Open Incidents*&quot;)]/rows/row/cell</target>
+				</targets>
+				<userCommand>
+					<type>script</type>
+					<runLocation>netprobe</runLocation>
+					<args>
+						<arg>
+							<static>/bin/python</static>
+						</arg>
+						<arg>
+							<static>/export/home/epayano/Integrations/pagerduty-integration/scripts/Incidents_Manager.py</static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static> -r &quot;</static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<xpath>../cell[(@column=&quot;Incident Keys&quot;)]/@value</xpath>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>&quot; </static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>-s </static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>&quot;3e2966c4fe574b978ca0db7414d5e504&quot;</static>
+						</arg>
+					</args>
+				</userCommand>
+			</command>
+			<command name="Acknowledge">
+				<targets>
+					<target>/geneos/gateway/directory/probe/managedEntity/sampler/dataview[wild(@name,&quot;Open Incidents*&quot;)]/rows/row/cell</target>
+				</targets>
+				<userCommand>
+					<type>script</type>
+					<runLocation>netprobe</runLocation>
+					<args>
+						<arg>
+							<static>/bin/python</static>
+						</arg>
+						<arg>
+							<static>/export/home/epayano/Integrations/pagerduty-integration/scripts/Incidents_Manager.py</static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static> -a &quot;</static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<xpath>../cell[(@column=&quot;Incident Keys&quot;)]/@value</xpath>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>&quot; </static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>-s </static>
+						</arg>
+						<arg>
+							<concatenate>true</concatenate>
+							<static>&quot;3e2966c4fe574b978ca0db7414d5e504&quot;</static>
+						</arg>
+					</args>
+				</userCommand>
+			</command>
+		</commandGroup>
+	</commands>
+	<rules>
+		<rule name="AutoDuty">
+			<targets>
+				<target>/geneos/gateway/directory/probe/managedEntity/sampler/dataview[(@name=&quot;Open Incidents Raw&quot;)]/rows/row/cell[(@column=&quot;Status&quot;)]</target>
+			</targets>
+			<priority>1</priority>
+			<block>
+				<if>
+					<like>
+						<dataItem>
+							<property>@value</property>
+						</dataItem>
+						<string>*acknowledged*</string>
+					</like>
+					<transaction>
+						<update>
+							<property>state/@severity</property>
+							<severity>warning</severity>
+						</update>
+					</transaction>
+					<if>
+						<like>
+							<dataItem>
+								<property>@value</property>
+							</dataItem>
+							<string>*triggered</string>
+						</like>
+						<transaction>
+							<update>
+								<property>state/@severity</property>
+								<severity>critical</severity>
+							</update>
+						</transaction>
+					</if>
+				</if>
+			</block>
+		</rule>
+		<rule disabled="true" name="CPU-used">
+			<targets>
+				<target>/geneos/gateway[(@name=&quot;MobileAppTest&quot;)]/directory/probe/managedEntity/sampler[(@name=&quot;CPU&quot;)][(@type=&quot;Infra&quot;)]/dataview[(@name=&quot;CPU&quot;)]/rows/row/cell[(@column=&quot;percentUtilisation&quot;)]</target>
+			</targets>
+			<priority>1</priority>
+			<evaluateOnDataviewSample>false</evaluateOnDataviewSample>
+			<block>
+				<if>
+					<equal>
+						<mod>
+							<dataItem>
+								<property>@value</property>
+							</dataItem>
+							<integer>3</integer>
+						</mod>
+						<integer>2</integer>
+					</equal>
+					<transaction>
+						<userData>
+							<name>_PREVIOUS_SEV</name>
+							<dataItem>
+								<property>state/@severity</property>
+							</dataItem>
+						</userData>
+						<update>
+							<property>state/@severity</property>
+							<severity>ok</severity>
+						</update>
+						<action ref="PagerDuty_Incident_Call"/>
+					</transaction>
+					<if>
+						<equal>
+							<mod>
+								<dataItem>
+									<property>@value</property>
+								</dataItem>
+								<integer>3</integer>
+							</mod>
+							<integer>1</integer>
+						</equal>
+						<transaction>
+							<userData>
+								<name>_PREVIOUS_SEV</name>
+								<dataItem>
+									<property>state/@severity</property>
+								</dataItem>
+							</userData>
+							<update>
+								<property>state/@severity</property>
+								<severity>warning</severity>
+							</update>
+							<action ref="PagerDuty_Incident_Call"/>
+						</transaction>
+						<if>
+							<equal>
+								<mod>
+									<dataItem>
+										<property>@value</property>
+									</dataItem>
+									<integer>3</integer>
+								</mod>
+								<integer>0</integer>
+							</equal>
+							<transaction>
+								<userData>
+									<name>_PREVIOUS_SEV</name>
+									<dataItem>
+										<property>state/@severity</property>
+									</dataItem>
+								</userData>
+								<update>
+									<property>state/@severity</property>
+									<severity>critical</severity>
+								</update>
+								<action ref="PagerDuty_Incident_Call"/>
+							</transaction>
+						</if>
+					</if>
+				</if>
+			</block>
+		</rule>
+	</rules>
+	<environments>
+		<environment name="PagerDuty">
+			<var name="Incidents_List">
+				<externalConfigFile>import requests, base64, json, sys, argparse, os
+from time import sleep
+from argparse import RawTextHelpFormatter
+
+# apiKey = &quot;QiaeVM4257psyzkVSs5Q&quot;
+authorization_token = &apos;QiaeVM4257psyzkVSs5Q&apos;
+pagerduty_session = requests.Session()
+pagerduty_session.headers.update({
+  &apos;Authorization&apos;: &apos;Token token=&apos; + authorization_token,
+  &apos;Accept&apos;: &apos;application/vnd.pagerduty+json;version=2&apos;
+})
+
+# Limit for num of inicdents (This you can tweak)
+Pagination_Limit = 10
+
+# Assume Offset is None
+Offset = 0
+
+# Our_Incidents
+DV_Incidents = {}
+
+# list out all of the alerts for incident
+def List_Alerts(Incident_ID):
+
+    # URL for the incident in inquiry
+    Incident_Alerts_Url = &quot;https://api.pagerduty.com/incidents/&quot; + str(Incident_ID) + &quot;/alerts?sort_by=created_at%3Adesc&quot;
+
+    # print Inicident_Alerts_Url
+
+    # Starting_URL = &quot;https://api.pagerduty.com/incidents?statuses%5B%5D=triggered&amp;statuses%5B%5D=acknowledged&amp;time_zone=UTC&amp;include%5B%5D=first_trigger_log_entries&amp;include%5B%5D=assignees&amp;include%5B%5D=acknowledgers&amp;total=true&amp;limit=&quot; + str(Pagination_Limit)
+    Alerts_list = pagerduty_session.get(Incident_Alerts_Url)
+
+    # response.encoding = &apos;utf-8&apos;
+    if Alerts_list.status_code != 202 and Alerts_list.status_code != 200:
+        raise ValueError(
+            &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+            % (Alerts_list.status_code, Alerts_list.text)
+        )
+
+    Alerts = Alerts_list.json()
+    # print(json.dumps(Alerts, indent=2))
+    DV_Incidents[Incident_ID][&quot;alert_id&quot;] = Alerts[&quot;alerts&quot;][0][&quot;id&quot;]
+    DV_Incidents[Incident_ID][&quot;alert_summary&quot;] = Alerts[&quot;alerts&quot;][0][&quot;summary&quot;]
+    # print Alerts[&quot;alerts&quot;][0][&quot;id&quot;]
+
+    # return Alerts_Details
+    # Get_Alerts_Url = &quot;https://api.pagerduty.com/incidents/&quot; + str(Incident_ID) + &quot;/alerts/&quot; + Alerts[&quot;alerts&quot;][0][&quot;id&quot;]
+    #
+    # # make the call
+    # Alerts_Details_Call = pagerduty_session.get(Get_Alerts_Url)
+    #
+    # # response.encoding = &apos;utf-8&apos;
+    # if Alerts_Details_Call.status_code != 202 and Alerts_Details_Call.status_code != 200:
+    #     raise ValueError(
+    #         &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+    #         % (Alerts_Details_Call.status_code, Alerts_Details_Call.text)
+    #     )
+    #
+    #
+    # Alert_Details = Alerts_Details_Call.json()
+    # print(json.dumps(Alert_Details, indent=2))
+
+
+# function to call to add to your incident list
+def Update_Incident_List(JSON_Payload):
+
+    # list out your incidents
+    for Incident in JSON_Payload[&quot;incidents&quot;]:
+
+        # Print json response info to the screen
+        bGeneosIncidents = False
+
+        # Geneos_Path = &quot;Not Geneos Alert Generated Inicident&quot;
+        Geneos_Path = &quot;&quot;
+
+        # print(json.dumps(Incident, indent=2))
+        if &quot;channel&quot; in Incident[&quot;first_trigger_log_entry&quot;]:
+            if &quot;details&quot; in Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;]:
+                Details = Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;]
+                if Details is not None and &quot;Geneos Event Data&quot; in Details.keys():
+                    if &quot;_VARIABLEPATH&quot; in Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;]:
+                        Geneos_Path = Incident[&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;][&quot;_VARIABLEPATH&quot;]
+                        bGeneosIncidents = True
+        #
+        DV_Incidents[Incident[&quot;id&quot;]] = Incident
+        DV_Incidents[Incident[&quot;id&quot;]][&quot;Geneos_Path&quot;] = Geneos_Path
+        List_Alerts(Incident[&quot;id&quot;])
+        # QueryAlertParallel(Incident[&quot;id&quot;])
+
+if __name__ == &quot;__main__&quot;:
+
+    # Starting list for incidents
+    Starting_URL = &quot;https://api.pagerduty.com/incidents?statuses%5B%5D=triggered&amp;statuses%5B%5D=acknowledged&amp;time_zone=UTC&amp;include%5B%5D=first_trigger_log_entries&amp;include%5B%5D=assignees&amp;include%5B%5D=acknowledgers&amp;total=true&amp;limit=&quot; + str(Pagination_Limit)
+
+    # Prep response for necessary results
+    Incidents_list = pagerduty_session.get(Starting_URL)
+
+    # response.encoding = &apos;utf-8&apos;
+    if Incidents_list.status_code != 202 and Incidents_list.status_code != 200:
+        raise ValueError(
+            &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+            % (Incidents_list.status_code, Incidents_list.text)
+            )
+
+    Incidents = Incidents_list.json()
+    # print(json.dumps(Incidents, indent=2))
+
+    # Add to the Incident list
+    Update_Incident_List(Incidents)
+
+    # print (&quot;----- Entering Loop -----\n&quot;)
+
+    # If there are more incidents
+    while Incidents[&quot;more&quot;]:
+        Offset += Pagination_Limit
+        Starting_URL += &quot;&amp;offset=&quot; + str(Offset)
+
+        # Run the Incidents query again
+        Incidents_list = pagerduty_session.get(Starting_URL)
+
+        # response.encoding = &apos;utf-8&apos;
+        if Incidents_list.status_code != 202 and Incidents_list.status_code != 200:
+            raise ValueError(
+                &apos;Request to PagerDuty a server returned an error %s, the response is:\n%s&apos;
+                % (Incidents_list.status_code, User_List.text)
+            )
+
+        Incidents = Incidents_list.json()
+        # print(json.dumps(Incidents, indent=2))
+
+        # Add to the Incident list
+        Update_Incident_List(Incidents)
+
+    # print (&quot;----- Exit Loop -----\n&quot;)
+
+    # Print out column headings
+    print(&quot;Id, Last Alert, Status, Creation Time, Last Update, Geneos Path, Incident Keys&quot;)
+    print(&quot;&lt;!&gt; Open Incidents, &quot; + str(len(DV_Incidents)))
+    for Incident in DV_Incidents:
+
+        # print(json.dumps(Incident, indent=2))
+        #Print json response info to the screen
+        bGeneosIncidents = False
+
+        # Geneos_Path = &quot;Not Geneos Alert Generated Inicident&quot;
+        Geneos_Path = &quot;&quot;
+
+        if &quot;details&quot; in DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;]:
+            Details = DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;]
+            if Details is not None and &quot;Geneos Event Data&quot; in Details.keys():
+                if &quot;_VARIABLEPATH&quot; in DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;]:
+                    Geneos_Path = DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;details&quot;][&quot;Geneos Event Data&quot;][&quot;_VARIABLEPATH&quot;]
+                    bGeneosIncidents = True
+
+        # print row information
+        print(DV_Incidents[Incident][&quot;id&quot;] + &quot;,&quot; + \
+            DV_Incidents[Incident][&quot;alert_summary&quot;] + &quot;,&quot; + \
+            # DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;description&quot;] + &quot;,&quot; + \
+            DV_Incidents[Incident][&quot;status&quot;] + &quot;,&quot; + \
+            DV_Incidents[Incident][&quot;created_at&quot;] + &quot;,&quot; + \
+            DV_Incidents[Incident][&quot;last_status_change_at&quot;] + &quot;,&quot; + \
+            Geneos_Path + &quot;,&quot; + \
+            DV_Incidents[Incident][&quot;first_trigger_log_entry&quot;][&quot;channel&quot;][&quot;incident_key&quot;])
+</externalConfigFile>
+			</var>
+			<var name="PD_ACCESS_KEY">
+				<string>QiaeVM4257psyzkVSs5Q</string>
+			</var>
+			<var name="PD_SERVICE_KEY">
+				<string>3e2966c4fe574b978ca0db7414d5e504</string>
+			</var>
+		</environment>
+	</environments>
+</gateway>
